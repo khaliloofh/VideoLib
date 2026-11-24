@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<title>Video Library</title>
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        background: #121212;
+        color: #eee;
+        font-family: -apple-system, "Segoe UI", sans-serif;
+        padding: 30px 40px;
+        margin: 0;
+    }
+
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .header h1 {
+        font-size: 24px;
+        margin: 0;
+    }
+
+    .upload-btn {
+        background: #CC785C;
+        color: #121212;
+        padding: 10px 18px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 14px;
+    }
+
+    .empty {
+        color: #777;
+        margin-top: 60px;
+        text-align: center;
+    }
+
+    /* Watch heatmap — sabit ölçülü, kalendar boyda qutu */
+    .heatmap-card {
+        display: inline-block;
+        background: #1e1e1e;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 16px 16px 12px;
+        margin-bottom: 30px;
+    }
+
+    .heatmap-center {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .heatmap-wrap {
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-top: 14px;
+    }
+
+    .heatmap {
+        display: inline-flex;
+        gap: 3px;
+    }
+
+    .week-col {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        position: relative;
+        width: 11px;
+        height: 95px; /* 7 x 11px + 6 x 3px gap — sərt ölçü */
+    }
+
+    .month-label {
+        position: absolute;
+        top: -16px;
+        left: 0;
+        font-size: 10px;
+        color: #777;
+        white-space: nowrap;
+    }
+
+    .hcell {
+        width: 11px;
+        height: 11px;
+        min-width: 11px;
+        min-height: 11px;
+        max-width: 11px;
+        max-height: 11px;
+        border-radius: 2px;
+        background: #2a2a2a;
+    }
+    .hcell.empty { visibility: hidden; }
+    .hcell.l0 { background: #2a2a2a; }
+    .hcell.l1 { background: rgba(204, 120, 92, 0.25); }
+    .hcell.l2 { background: rgba(204, 120, 92, 0.5); }
+    .hcell.l3 { background: rgba(204, 120, 92, 0.75); }
+    .hcell.l4 { background: #CC785C; box-shadow: 0 0 4px rgba(204, 120, 92, 0.6); }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 20px;
+    }
+
+    .card {
+        background: #1e1e1e;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.15s ease;
+        position: relative;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+    }
+
+    .card-link {
+        text-decoration: none;
+        color: #eee;
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+    }
+
+    .thumb {
+        width: 100%;
+        height: 120px;
+        background: #2a2a2a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        font-size: 28px;
+        flex-shrink: 0;
+    }
+
+    .thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .card-info {
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex-grow: 1;
+    }
+
+    .card-title {
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .progress-bg {
+        background: #333;
+        height: 4px;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: auto;
+    }
+
+    .progress-fill {
+        background: #CC785C;
+        height: 100%;
+    }
+
+    .delete-form {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        margin: 0;
+    }
+
+    .delete-btn {
+        background: rgba(0,0,0,0.6);
+        color: #eee;
+        border: none;
+        border-radius: 4px;
+        width: 26px;
+        height: 26px;
+        cursor: pointer;
+        font-size: 13px;
+    }
+
+    .delete-btn:hover {
+        background: #e06c5c;
+    }
+</style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Video Library</h1>
+        <a class="upload-btn" href="{% url 'library:upload_video' %}">+ Yeni video</a>
+    </div>
+
+    <div class="heatmap-center">
+        <div class="heatmap-card">
+            <div class="heatmap-wrap">
+                <div class="heatmap">
+                {% for week in heatmap %}
+                    <div class="week-col">
+                        <div class="month-label">{{ week.label }}</div>
+                        {% for cell in week.days %}
+                            {% if cell %}
+                                <div class="hcell l{{ cell.level }}" title="{{ cell.date }} — {{ cell.minutes }} dəqiqə"></div>
+                            {% else %}
+                                <div class="hcell empty"></div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if videos %}
+        <div class="grid">
+            {% for video in videos %}
+                <div class="card">
+                    <a class="card-link" href="{% url 'library:video_player' video.id %}">
+                        <div class="thumb">
+                            {% if video.thumbnail %}
+                                <img src="{{ video.thumbnail.url }}" alt="">
+                            {% else %}
+                                ▶
+                            {% endif %}
+                        </div>
+                        <div class="card-info">
+                            <div class="card-title">{{ video.title|default:"(adsız video)" }}</div>
+                            <div class="progress-bg">
+                                {% if video.duration %}
+                                    <div class="progress-fill" style="width: {% widthratio video.last_position video.duration 100 %}%;"></div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                    <form method="post" action="{% url 'library:delete_video' video.id %}" class="delete-form" onsubmit="return confirm('Bu videonu silmək istədiyinə əminsən?');">
+                        {% csrf_token %}
+                        <button type="submit" class="delete-btn">✕</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="empty">Hələ heç bir video yoxdur.</p>
+    {% endif %}
+
+</body>
+</html>

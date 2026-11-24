@@ -1,0 +1,26 @@
+# Virtual mühit (bunu GitHub-a göndərmək olmaz)
+venv/
+env/
+.venv/
+ENV/
+
+# Python tərəfindən yaradılan keş faylları
+__pycache__/
+*.pyc
+*$py.class
+
+# Verilənlər bazası və məxfi məlumatlar
+db.sqlite3
+db.sqlite3-journal
+.env
+local_settings.py
+
+# Redaktor faylları
+.vscode/
+.idea/
+.DS_Store
+
+# Statik fayllar (əgər collectstatic etmisinizsə)
+staticfiles/
+
+media/

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<title>{{ video.title }}</title>
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        background: #121212;
+        color: #eee;
+        font-family: -apple-system, "Segoe UI", sans-serif;
+        padding: 30px 40px;
+        margin: 0;
+    }
+
+    a {
+        color: #CC785C;
+        text-decoration: none;
+    }
+
+    h1 {
+        font-size: 22px;
+        margin: 16px 0 0 0;
+    }
+
+    h3 {
+        font-size: 16px;
+        margin-top: 30px;
+        margin-bottom: 10px;
+    }
+
+    .top-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 900px;
+    }
+
+    .delete-btn {
+        background: #e06c5c;
+        color: #121212;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 14px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: bold;
+    }
+
+    .delete-btn:hover {
+        background: #ea8577;
+    }
+
+    .player-wrap {
+        position: relative;
+        width: 100%;
+        max-width: 900px;
+        margin-top: 16px;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        outline: none;
+    }
+
+    .player-wrap video {
+        width: 100%;
+        display: block;
+    }
+
+    video::cue {
+        background: rgba(0, 0, 0, 0.6);
+        font-size: 1.1em;
+    }
+
+    .controls {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 10px 14px;
+        background: linear-gradient(transparent, rgba(0,0,0,0.75));
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        transition: opacity 0.25s ease;
+    }
+
+    .controls.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .seek-bar {
+        width: 100%;
+        cursor: pointer;
+        accent-color: #CC785C;
+    }
+
+    .buttons-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .ctrl-btn {
+        background: none;
+        border: none;
+        color: #eee;
+        font-size: 16px;
+        cursor: pointer;
+        padding: 4px 8px;
+    }
+
+    .ctrl-btn:hover {
+        color: #CC785C;
+    }
+
+    .time-label {
+        font-size: 12px;
+        color: #ccc;
+        margin-left: auto;
+    }
+
+    .shortcuts-hint {
+        max-width: 900px;
+        font-size: 12px;
+        color: #777;
+        margin-top: 8px;
+    }
+
+    textarea {
+        width: 100%;
+        max-width: 900px;
+        min-height: 120px;
+        background: #1e1e1e;
+        color: #eee;
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 10px;
+        font-family: -apple-system, "Segoe UI", sans-serif;
+        font-size: 14px;
+        resize: vertical;
+    }
+
+    .note-form {
+        max-width: 900px;
+    }
+
+    .save-btn {
+        background: #CC785C;
+        color: #121212;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 18px;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 10px;
+    }
+
+    .save-btn:hover {
+        background: #d98a6f;
+    }
+</style>
+</head>
+<body>
+
+    <div class="top-row">
+        <a href="{% url 'library:video_list' %}">← Geri</a>
+        <form method="post" action="{% url 'library:delete_video' video.id %}" onsubmit="return confirm('Bu videonu silmək istədiyinə əminsən?');">
+            {% csrf_token %}
+            <button type="submit" class="delete-btn">Sil</button>
+        </form>
+    </div>
+
+    <h1>{{ video.title }}</h1>
+
+    <div class="player-wrap" id="playerWrap" tabindex="0">
+        <video id="player" src="{{ video.file.url }}">
+            {% if video.subtitle %}
+                <track kind="subtitles" src="{{ video.subtitle.url }}" srclang="az" label="Altyazı" default>
+            {% endif %}
+        </video>
+
+        <div class="controls" id="controls">
+            <input type="range" class="seek-bar" id="seekBar" min="0" max="100" value="0" step="0.1">
+            <div class="buttons-row">
+                <button class="ctrl-btn" id="playBtn">▶</button>
+                <button class="ctrl-btn" id="muteBtn">🔊</button>
+                <button class="ctrl-btn" id="fullscreenBtn">⛶</button>
+                <span class="time-label" id="timeLabel">0:00 / 0:00</span>
+            </div>
+        </div>
+    </div>
+
+    <p class="shortcuts-hint">Space — dayandır/davam et · ← / → — 10 saniyə geri/irəli · ↑ / ↓ — səs</p>
+
+    <h3>Qeydlər</h3>
+    <form method="post" class="note-form">
+        {% csrf_token %}
+        {{ note_form.note }}
+        <br>
+        <button type="submit" class="save-btn">Saxla</button>
+    </form>
+    <script>
+        const videoEl = document.getElementById('player');
+        const wrap = document.getElementById('playerWrap');
+        const controls = document.getElementById('controls');
+        const seekBar = document.getElementById('seekBar');
+        const playBtn = document.getElementById('playBtn');
+        const muteBtn = document.getElementById('muteBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const timeLabel = document.getElementById('timeLabel');
+
+        const startPosition = {{ video.last_position|default:0 }};
+        const saveUrl = "{% url 'library:save_position' video.id %}";
+        let hasResumed = false;
+        let hideTimeout = null;
+        let lastTimeUpdate = null;
+        let watchedSinceLastSave = 0;
+
+        function formatTime(sec) {
+            if (!isFinite(sec)) return '0:00';
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        videoEl.addEventListener('loadedmetadata', () => {
+            if (!hasResumed && startPosition > 0 && startPosition < videoEl.duration - 2) {
+                videoEl.currentTime = startPosition;
+            }
+            hasResumed = true;
+            seekBar.max = videoEl.duration;
+        });
+
+        videoEl.addEventListener('timeupdate', () => {
+            if (!videoEl.seeking) {
+                seekBar.value = videoEl.currentTime;
+                if (lastTimeUpdate !== null && !videoEl.paused) {
+                    const delta = videoEl.currentTime - lastTimeUpdate;
+                    if (delta > 0 && delta < 2) {
+                        watchedSinceLastSave += delta;
+                    }
+                }
+                lastTimeUpdate = videoEl.currentTime;
+            }
+            timeLabel.textContent = `${formatTime(videoEl.currentTime)} / ${formatTime(videoEl.duration)}`;
+        });
+
+        seekBar.addEventListener('input', () => {
+            videoEl.currentTime = seekBar.value;
+        });
+
+        playBtn.addEventListener('click', () => {
+            videoEl.paused ? videoEl.play() : videoEl.pause();
+        });
+
+        videoEl.addEventListener('click', () => {
+            videoEl.paused ? videoEl.play() : videoEl.pause();
+        });
+
+        videoEl.addEventListener('play', () => { playBtn.textContent = '⏸'; });
+        videoEl.addEventListener('pause', () => { playBtn.textContent = '▶'; });
+
+        muteBtn.addEventListener('click', () => {
+            videoEl.muted = !videoEl.muted;
+            muteBtn.textContent = videoEl.muted ? '🔇' : '🔊';
+        });
+
+        fullscreenBtn.addEventListener('click', () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                wrap.requestFullscreen();
+            }
+        });
+
+        function showControls() {
+            controls.classList.remove('hidden');
+            wrap.style.cursor = 'default';
+            clearTimeout(hideTimeout);
+            if (!videoEl.paused) {
+                hideTimeout = setTimeout(() => {
+                    controls.classList.add('hidden');
+                    wrap.style.cursor = 'none';
+                }, 3000);
+            }
+        }
+
+        wrap.addEventListener('mousemove', showControls);
+        wrap.addEventListener('mouseenter', showControls);
+        videoEl.addEventListener('play', showControls);
+        showControls();
+
+        videoEl.textTracks.addEventListener('addtrack', (e) => {
+            const track = e.track;
+            track.mode = 'hidden';
+            setTimeout(() => {
+                track.mode = 'showing';
+                if (track.cues) {
+                    for (let i = 0; i < track.cues.length; i++) {
+                        track.cues[i].line = -4;
+                    }
+                }
+            }, 100);
+        });
+
+        wrap.addEventListener('keydown', (e) => {
+            switch (e.code) {
+                case 'Space':
+                    e.preventDefault();
+                    videoEl.paused ? videoEl.play() : videoEl.pause();
+                    showControls();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    videoEl.currentTime = Math.min(videoEl.currentTime + 10, videoEl.duration || videoEl.currentTime + 10);
+                    showControls();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    videoEl.currentTime = Math.max(videoEl.currentTime - 10, 0);
+                    showControls();
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    videoEl.volume = Math.min(videoEl.volume + 0.1, 1);
+                    showControls();
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    videoEl.volume = Math.max(videoEl.volume - 0.1, 0);
+                    showControls();
+                    break;
+            }
+        });
+
+        function savePosition() {
+            if (!videoEl.duration || videoEl.seeking) return;
+            const watched = watchedSinceLastSave;
+            watchedSinceLastSave = 0;
+            fetch(saveUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `position=${videoEl.currentTime}&duration=${videoEl.duration}&watched_seconds=${watched}`
+            });
+        }
+
+        setInterval(savePosition, 5000);
+        videoEl.addEventListener('pause', savePosition);
+        window.addEventListener('beforeunload', savePosition);
+    </script>
+
+</body>
+</html>
